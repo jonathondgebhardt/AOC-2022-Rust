@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 #[derive(Debug)]
-struct Node {
+pub struct Node {
     size: Option<u32>,
     name: String,
     parent: RefCell<Weak<Node>>,
@@ -55,29 +55,17 @@ impl Node {
         size
     }
 
-    pub fn get_size_with_ceiling(&self, ceiling: u32) -> u32 {
-        let mut size: u32 = self.size.unwrap_or_default();
-        for child in self.children.borrow().iter() {
-            let child_size = child.get_size_with_ceiling(ceiling);
-            if child_size <= ceiling {
-                size += child_size;
-            }
-        }
-
-        size
-    }
-
     pub fn is_directory(&self) -> bool {
         !self.children.borrow().is_empty()
     }
 
-    pub fn collect_directories(&self) -> Vec<Rc<Node>> {
+    pub fn collect_directories(self_: &Rc<Node>) -> Vec<Rc<Node>> {
         let mut dirs: Vec<Rc<Node>> = Vec::new();
 
-        for child in self.children.borrow().iter().filter(|c| c.is_directory()) {
+        for child in self_.children.borrow().iter().filter(|c| c.is_directory()) {
             dirs.push(Rc::clone(child));
 
-            let mut child_dirs = child.collect_directories();
+            let mut child_dirs = Node::collect_directories(child);
             dirs.append(&mut child_dirs);
         }
 
@@ -85,11 +73,10 @@ impl Node {
     }
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
-    let root = Node::build(None, String::from("/"));
+pub fn build_fs(s: &str, root: &Rc<Node>) {
     let mut node = Rc::clone(&root);
 
-    let mut iter = input.lines();
+    let mut iter = s.lines();
     iter.next();
 
     for line in iter {
@@ -114,18 +101,44 @@ pub fn part_one(input: &str) -> Option<u32> {
             Node::add_child(&node, &child);
         }
     }
+}
 
-    let dirs = root.collect_directories();
+pub fn part_one(input: &str) -> Option<u32> {
+    let root = Node::build(None, String::from("/"));
+    build_fs(input, &root);
+
+    let dirs = Node::collect_directories(&root);
     let mut size = 0;
     for dir in dirs {
-        size += dir.get_size_with_ceiling(100_000);
+        let dir_size = dir.get_size();
+        if dir_size <= 100_000 {
+            size += dir_size;
+        }
     }
 
     Some(size)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let root = Node::build(None, String::from("/"));
+    build_fs(input, &root);
+
+    let mut doomed_size = root.get_size();
+    let total_disk_space = 70_000_000;
+    let remaining_space = total_disk_space - doomed_size;
+
+    let upgrade_size = 30_000_000;
+    let required_space = upgrade_size - remaining_space;
+
+    let dirs = Node::collect_directories(&root);
+    for dir in dirs {
+        let dir_size = dir.get_size();
+        if dir_size >= required_space && dir_size < doomed_size {
+            doomed_size = dir_size;
+        }
+    }
+
+    Some(doomed_size)
 }
 
 fn main() {
@@ -148,7 +161,7 @@ mod tests {
         #[test]
         fn test_part_two() {
             let input = aoc::read_file("examples", 7);
-            assert_eq!(part_two(&input), None);
+            assert_eq!(part_two(&input), Some(24933642));
         }
 
         #[test]
