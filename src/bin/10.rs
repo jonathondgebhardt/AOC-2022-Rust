@@ -153,7 +153,7 @@ addx -5",
         #[test]
         fn test_part_two() {
             let input = aoc::read_file("examples", 10);
-            assert!(part_two(&input).is_some());
+            assert_eq!(part_two(&input), None);
         }
     }
 }
