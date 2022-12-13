@@ -8,25 +8,25 @@ pub enum Operation {
 
 #[derive(Debug)]
 pub struct Monkey {
-    items: Vec<u128>,
+    items: Vec<u32>,
     operation: Operation,
-    modifier: Option<u128>,
-    divisor: u128,
+    modifier: Option<u32>,
+    divisor: u32,
     true_monkey: usize,
     false_monkey: usize,
     inspect_count: u32,
-    should_apply_worry: bool,
+    should_apply_bored: bool,
 }
 
 impl Monkey {
-    pub fn build(s: &[&str], apply_worry: bool) -> Self {
+    pub fn build(s: &[&str], should_apply_bored: bool) -> Self {
         let mut iter = s[1].split(": ");
         iter.next();
-        let items: Vec<u128> = iter
+        let items: Vec<u32> = iter
             .next()
             .unwrap()
             .split(", ")
-            .map(|n| n.parse::<u128>().unwrap())
+            .map(|n| n.parse::<u32>().unwrap())
             .collect();
 
         let operation = if s[2].contains("*") {
@@ -35,13 +35,7 @@ impl Monkey {
             Operation::Add
         };
 
-        let modifier = match s[2]
-            .split_whitespace()
-            .rev()
-            .next()
-            .unwrap()
-            .parse::<u128>()
-        {
+        let modifier = match s[2].split_whitespace().rev().next().unwrap().parse::<u32>() {
             Ok(modifier) => Some(modifier),
             _ => None,
         };
@@ -51,7 +45,7 @@ impl Monkey {
             .rev()
             .next()
             .unwrap()
-            .parse::<u128>()
+            .parse::<u32>()
             .unwrap();
 
         let true_monkey = s[4]
@@ -78,33 +72,36 @@ impl Monkey {
             true_monkey,
             false_monkey,
             inspect_count: 0,
-            should_apply_worry: apply_worry,
+            should_apply_bored,
         }
     }
 
-    fn apply_worry(&self, item: u128) -> u128 {
-        if self.should_apply_worry {
-            match self.operation {
-                Operation::Add => match self.modifier {
-                    Some(modifier) => item + modifier,
-                    None => item + item,
-                },
-                Operation::Multiply => match self.modifier {
-                    Some(modifier) => item * modifier,
-                    // overflow on part 2
-                    None => item * item,
-                },
-            }
+    fn apply_worry(&self, item: u32) -> u32 {
+        match self.operation {
+            Operation::Add => match self.modifier {
+                Some(modifier) => {
+                    ((item % self.divisor) + (modifier % self.divisor)) % self.divisor
+                }
+                None => ((item % self.divisor) + (item % self.divisor)) % self.divisor,
+            },
+            Operation::Multiply => match self.modifier {
+                Some(modifier) => {
+                    ((item % self.divisor) * (modifier % self.divisor)) % self.divisor
+                }
+                None => ((item % self.divisor) * (item % self.divisor)) % self.divisor,
+            },
+        }
+    }
+
+    fn apply_bored(&self, item: u32) -> u32 {
+        if self.should_apply_bored {
+            item / 3
         } else {
             item
         }
     }
 
-    fn apply_bored(&self, item: u128) -> u128 {
-        item / 3
-    }
-
-    fn get_monkey_receiver(&self, item: u128) -> usize {
+    fn get_monkey_receiver(&self, item: u32) -> usize {
         if item % self.divisor == 0 {
             self.true_monkey
         } else {
@@ -112,15 +109,15 @@ impl Monkey {
         }
     }
 
-    fn receive_items(&mut self, items: &mut Vec<u128>) {
+    fn receive_items(&mut self, items: &mut Vec<u32>) {
         self.items.append(items);
     }
 
-    pub fn remove_first(&mut self) -> u128 {
+    pub fn remove_first(&mut self) -> u32 {
         self.items.remove(0)
     }
 
-    pub fn inspect_item(&mut self) -> (u128, usize) {
+    pub fn inspect_item(&mut self) -> (u32, usize) {
         assert!(!self.is_done());
 
         self.inspect_count += 1;
@@ -141,17 +138,17 @@ impl Monkey {
     }
 }
 
-pub fn get_monkey_business(s: &str, n: u32, apply_worry: bool) -> u128 {
+pub fn get_monkey_business(s: &str, n: u32, apply_bored: bool) -> u32 {
     let monkey_lines: Vec<&str> = s.lines().collect();
     let mut monkeys: Vec<Monkey> = monkey_lines[..]
         .chunks(7)
-        .map(|line| Monkey::build(line, apply_worry))
+        .map(|line| Monkey::build(line, apply_bored))
         .collect();
 
     for _ in 0..n {
         for index in 0..monkeys.len() {
             let monkey = &mut monkeys[index];
-            let mut sent_items: HashMap<usize, Vec<u128>> = HashMap::new();
+            let mut sent_items: HashMap<usize, Vec<u32>> = HashMap::new();
 
             while !monkey.is_done() {
                 let (item, receiver) = monkey.inspect_item();
@@ -165,15 +162,15 @@ pub fn get_monkey_business(s: &str, n: u32, apply_worry: bool) -> u128 {
     }
 
     monkeys.sort_by(|a, b| a.get_inspect_count().cmp(&b.get_inspect_count()).reverse());
-    monkeys[0].get_inspect_count() as u128 * monkeys[1].get_inspect_count() as u128
+    monkeys[0].get_inspect_count() * monkeys[1].get_inspect_count()
 }
 
-pub fn part_one(input: &str) -> Option<u128> {
+pub fn part_one(input: &str) -> Option<u32> {
     Some(get_monkey_business(input, 20, true))
 }
 
-pub fn part_two(input: &str) -> Option<u128> {
-    Some(get_monkey_business(input, 10_000, true))
+pub fn part_two(input: &str) -> Option<u32> {
+    Some(get_monkey_business(input, 10_000, false))
 }
 
 fn main() {
