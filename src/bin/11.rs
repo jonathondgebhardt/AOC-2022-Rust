@@ -8,7 +8,7 @@ pub enum Operation {
 pub struct Monkey {
     items: Vec<u32>,
     operation: Operation,
-    modifier: u32,
+    modifier: Option<u32>,
     divisor: u32,
     true_monkey: usize,
     false_monkey: usize,
@@ -31,14 +31,11 @@ impl Monkey {
             Operation::Add
         };
 
-        // maybe old instead of number
-        let modifier = s[2]
-            .split_whitespace()
-            .rev()
-            .next()
-            .unwrap()
-            .parse::<u32>()
-            .unwrap();
+        // may be old instead of number
+        let modifier = match s[2].split_whitespace().rev().next().unwrap().parse::<u32>() {
+            Ok(modifier) => Some(modifier),
+            _ => None,
+        };
 
         let divisor = s[3]
             .split_whitespace()
@@ -73,13 +70,70 @@ impl Monkey {
             false_monkey,
         }
     }
+
+    fn apply_worry(&self, item: u32) -> u32 {
+        match self.operation {
+            Operation::Add => match self.modifier {
+                Some(modifier) => item + modifier,
+                None => item + item,
+            },
+            Operation::Multiply => match self.modifier {
+                Some(modifier) => item * modifier,
+                None => item * item,
+            },
+        }
+    }
+
+    fn apply_bored(&self, item: u32) -> u32 {
+        item / 3
+    }
+
+    fn get_monkey_receiver(&self, item: u32) -> usize {
+        if item % self.divisor == 0 {
+            self.true_monkey
+        } else {
+            self.false_monkey
+        }
+    }
+
+    fn receive_items(&mut self, items: &mut Vec<u32>) {
+        self.items.append(items);
+    }
+
+    fn receive_item(&mut self, item: u32) {
+        self.items.push(item);
+    }
+
+    pub fn drop_first(&mut self) {
+        self.items.remove(0);
+    }
+
+    pub fn inspect_item(&self) -> (u32, usize) {
+        assert!(!self.is_done());
+
+        let mut item = self.items[0];
+        item = self.apply_worry(item);
+        item = self.apply_bored(item);
+
+        (item, self.get_monkey_receiver(item))
+    }
+
+    pub fn is_done(&self) -> bool {
+        self.items.is_empty()
+    }
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
     let monkey_lines: Vec<&str> = input.lines().collect();
-    for monkey in monkey_lines[..].chunks(7) {
-        let monkey = Monkey::build(monkey);
-        println!("{:?}", monkey);
+    let mut monkeys: Vec<Monkey> = monkey_lines[..].chunks(7).map(Monkey::build).collect();
+
+    for monkey in &monkeys {
+        while !monkey.is_done() {
+            let (item, receiver) = monkey.inspect_item();
+            println!("{} goes to {}", item, receiver);
+
+            let receiver = &mut monkeys[receiver];
+        }
     }
 
     None
